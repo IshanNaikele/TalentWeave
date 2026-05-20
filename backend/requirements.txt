@@ -18,3 +18,5 @@ faiss-cpu
 sentence-transformers
 pdfplumber 
 langchain-groq
+apscheduler
+icalendar

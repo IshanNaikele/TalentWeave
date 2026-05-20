@@ -67,3 +67,49 @@ def get_all_users():
         return res.json(), res.status_code
     except Exception as e:
         return {"detail": str(e)}, 500
+    
+
+
+def create_job(job_data: dict, pdf_file=None):
+    try:
+        data = {k: str(v) for k, v in job_data.items()}
+        files = {}
+        if pdf_file:
+            files["assignment_pdf"] = (pdf_file.name, pdf_file.getvalue(), "application/pdf")
+        res = requests.post(
+            f"{BASE_URL}/recruitment/jobs/create",
+            data=data,
+            files=files if files else None,
+            headers=get_headers()
+        )
+        return res.json(), res.status_code
+    except Exception as e:
+        return {"detail": str(e)}, 500
+
+def get_exam_attempts(job_id: int):
+    try:
+        res = requests.get(f"{BASE_URL}/recruitment/jobs/{job_id}/exam-attempts", headers=get_headers())
+        return res.json(), res.status_code
+    except Exception as e:
+        return {"detail": str(e)}, 500
+
+def get_assignment_submissions(job_id: int):
+    try:
+        res = requests.get(f"{BASE_URL}/recruitment/jobs/{job_id}/assignment-submissions", headers=get_headers())
+        return res.json(), res.status_code
+    except Exception as e:
+        return {"detail": str(e)}, 500
+
+def send_meet_invite(application_id: int):
+    try:
+        res = requests.post(f"{BASE_URL}/recruitment/send-meet/{application_id}", headers=get_headers())
+        return res.json(), res.status_code
+    except Exception as e:
+        return {"detail": str(e)}, 500
+
+def get_all_jobs():
+    try:
+        res = requests.get(f"{BASE_URL}/recruitment/jobs", headers=get_headers())
+        return res.json(), res.status_code
+    except Exception as e:
+        return {"detail": str(e)}, 500

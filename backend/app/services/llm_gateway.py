@@ -3,8 +3,9 @@ import json
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from app.schemas.recruitment import ResumeExtractionSchema, CandidateEvaluationSchema
-
-
+import json
+import uuid
+from typing import Optional
 load_dotenv()
 
 def get_llm():
@@ -13,6 +14,7 @@ def get_llm():
         model_name="llama-3.3-70b-versatile",
         temperature=0
     )
+
 
 async def extract_resume_data(raw_text: str) -> ResumeExtractionSchema:
     truncated_text = raw_text[:4000]
@@ -147,3 +149,150 @@ Now perform the evaluation and return the structured JSON. Return nothing else.
     structured_llm = llm.with_structured_output(CandidateEvaluationSchema)
     result = structured_llm.invoke(prompt)
     return result
+
+
+def _parse_questions_json(raw_text: str) -> list:
+    """
+    Safely extracts a JSON array from LLM output.
+    Handles markdown fences and finds array boundaries.
+    """
+    # Strip markdown fences if present
+    text = raw_text.strip()
+    if "```" in text:
+        lines = text.split("\n")
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+
+    # Find array boundaries
+    start = text.find("[")
+    end = text.rfind("]")
+    if start == -1 or end == -1:
+        raise ValueError("No JSON array found in LLM response.")
+
+    array_text = text[start:end + 1]
+    return json.loads(array_text)
+
+
+async def generate_personalized_questions(
+    jd_text: str,
+    resume_text: str,
+    num_questions: int,
+    difficulty: str,
+    focus_skills: Optional[str] = None
+) -> list:
+    """
+    Generates personalized MCQ questions for a candidate based on their
+    resume and the job description. Returns full question list including
+    correct_option — never expose this to the frontend.
+    """
+    focus_text = focus_skills if focus_skills else "general technical skills from the JD"
+
+    # Calculate bucket split
+    per_bucket = max(1, num_questions // 4)
+    remainder = num_questions - (per_bucket * 4)
+
+    prompt = f"""
+You are a Senior Technical Interviewer generating a personalized screening exam.
+
+## JOB DESCRIPTION:
+{jd_text[:2000]}
+
+## CANDIDATE RESUME:
+{resume_text[:2000]}
+
+## EXAM CONFIGURATION:
+- Difficulty: {difficulty}
+- Total Questions: {num_questions}
+- Focus Skills: {focus_text}
+
+## YOUR TASK:
+Generate exactly {num_questions} MCQ questions split into 4 buckets:
+- core_strengths: {per_bucket} questions — test skills candidate already has (verify depth)
+- jd_requirements: {per_bucket + remainder} questions — test skills explicitly required by the JD
+- skill_gaps: {per_bucket} questions — test skills missing from resume but required by JD
+- focus_skills: {per_bucket} questions — test the focus skills specified above
+
+## RULES:
+1. Each question must have exactly 4 options with keys: "A", "B", "C", "D"
+2. correct_option must be exactly one of: "A", "B", "C", "D"
+3. Questions must match the {difficulty} difficulty level
+4. No duplicate questions
+5. Return ONLY a valid JSON array, no markdown, no explanation
+
+## REQUIRED OUTPUT FORMAT (JSON array):
+[
+  {{
+    "question_id": "unique_string_id",
+    "question_text": "The actual question text",
+    "options": {{
+      "A": "First option text",
+      "B": "Second option text",
+      "C": "Third option text",
+      "D": "Fourth option text"
+    }},
+    "correct_option": "A",
+    "bucket": "core_strengths"
+  }}
+]
+
+Generate all {num_questions} questions now. Return only the JSON array.
+"""
+
+    llm = get_llm()
+    raw_response = llm.invoke(prompt)
+    raw_text = raw_response.content if hasattr(raw_response, 'content') else str(raw_response)
+
+    questions_raw = _parse_questions_json(raw_text)
+
+    # Ensure each question has a unique question_id
+    questions = []
+    for q in questions_raw:
+        if not q.get("question_id"):
+            q["question_id"] = str(uuid.uuid4())[:8]
+        questions.append(q)
+
+    return questions
+
+
+def grade_candidate_answers(
+    questions_with_answers: list,
+    submitted_answers: dict
+) -> dict:
+    """
+    Pure Python grader — no LLM needed.
+    questions_with_answers: full list from application.questions (includes correct_option)
+    submitted_answers: dict of question_id → chosen letter from candidate
+    Returns: score (0-100), per-question breakdown
+    """
+    if not questions_with_answers:
+        return {"score": 0, "correct": 0, "total": 0, "breakdown": []}
+
+    total = len(questions_with_answers)
+    correct_count = 0
+    breakdown = []
+
+    for q in questions_with_answers:
+        qid = q["question_id"]
+        correct = q["correct_option"]
+        submitted = submitted_answers.get(qid, None)
+        is_correct = submitted is not None and submitted.upper() == correct.upper()
+
+        if is_correct:
+            correct_count += 1
+
+        breakdown.append({
+            "question_id": qid,
+            "question_text": q["question_text"],
+            "correct_option": correct,
+            "submitted_option": submitted,
+            "is_correct": is_correct
+        })
+
+    score = round((correct_count / total) * 100)
+
+    return {
+        "score": score,
+        "correct": correct_count,
+        "total": total,
+        "breakdown": breakdown
+    }

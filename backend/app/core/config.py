@@ -7,7 +7,14 @@ class AppConfig(BaseSettings):
     PROJECT_NAME: str = "TalentWeave"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
-    
+    GMAIL_SENDER: str = ""
+    GMAIL_APP_PASSWORD: str = ""
+    DATABASE_URL: str = ""
+    SECRET_KEY: str = ""
+    HF_TOKEN: str = ""
+    GROQ_API_KEY: str = ""
+    GMAIL_SENDER: str = ""
+    GMAIL_APP_PASSWORD: str = ""
     # Strict Role Declarations
     ALLOWED_ROLES: List[str] = ["operations_team", "software_engineer", "sales_team"]
     
@@ -29,5 +36,7 @@ class AppConfig(BaseSettings):
 
     class Config:
         case_sensitive = True
+        env_file = ".env"
+
 
 settings = AppConfig()

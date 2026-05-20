@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentFlow — Candidate Exam</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; }
+  .screen { display: none; max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+  .screen.active { display: block; }
+  h1 { font-size: 1.6rem; margin-bottom: 6px; }
+  h2 { font-size: 1.2rem; margin-bottom: 20px; color: #444; font-weight: normal; }
+  .brand { font-size: 0.85rem; color: #888; margin-bottom: 32px; letter-spacing: 0.05em; text-transform: uppercase; }
+  label { display: block; font-size: 0.85rem; color: #555; margin-bottom: 4px; margin-top: 16px; }
+  input[type=text], input[type=email], input[type=tel] {
+    width: 100%; padding: 10px 12px; border: 1px solid #ccc; background: #fff;
+    font-size: 0.95rem; font-family: inherit; border-radius: 3px;
+  }
+  input:focus { outline: none; border-color: #333; }
+  .file-label {
+    display: inline-block; margin-top: 4px; padding: 9px 16px;
+    border: 1px solid #ccc; background: #fff; cursor: pointer;
+    font-size: 0.9rem; border-radius: 3px; font-family: inherit;
+  }
+  .file-label:hover { background: #f0f0f0; }
+  #resumeFile { display: none; }
+  #fileName { font-size: 0.82rem; color: #666; margin-top: 6px; }
+  .btn {
+    margin-top: 28px; padding: 11px 28px; background: #1a1a1a; color: #fff;
+    border: none; cursor: pointer; font-size: 0.95rem; font-family: inherit;
+    border-radius: 3px; width: 100%;
+  }
+  .btn:hover { background: #333; }
+  .btn:disabled { background: #999; cursor: not-allowed; }
+  .error { color: #c0392b; font-size: 0.85rem; margin-top: 12px; padding: 10px; background: #fdf0ee; border-radius: 3px; }
+  .info { color: #555; font-size: 0.85rem; margin-top: 12px; }
+
+  /* Exam screen */
+  #examHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #ddd; }
+  #timerBox { font-size: 1.1rem; font-variant-numeric: tabular-nums; color: #c0392b; }
+  #dotMap { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 24px; }
+  .dot { width: 20px; height: 20px; border-radius: 50%; background: #ddd; cursor: pointer; border: 2px solid transparent; transition: background 0.15s; }
+  .dot.answered { background: #2ecc71; }
+  .dot.current { border-color: #1a1a1a; }
+  #questionBox { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 24px; margin-bottom: 20px; }
+  #questionMeta { font-size: 0.78rem; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  #questionText { font-size: 1rem; line-height: 1.6; margin-bottom: 20px; }
+  .option { display: block; padding: 10px 14px; margin-bottom: 8px; border: 1px solid #ddd; background: #fafafa; cursor: pointer; border-radius: 3px; font-size: 0.92rem; font-family: inherit; text-align: left; width: 100%; }
+  .option:hover { background: #f0f0f0; }
+  .option.selected { background: #e8f4fd; border-color: #2980b9; }
+  #navRow { display: flex; gap: 10px; }
+  #navRow button { flex: 1; padding: 10px; background: #fff; border: 1px solid #ccc; cursor: pointer; font-family: inherit; font-size: 0.9rem; border-radius: 3px; }
+  #navRow button:hover { background: #f0f0f0; }
+  #submitExamBtn { margin-top: 20px; width: 100%; padding: 12px; background: #27ae60; color: #fff; border: none; cursor: pointer; font-size: 0.95rem; font-family: inherit; border-radius: 3px; }
+  #submitExamBtn:hover { background: #229954; }
+  #submitExamBtn:disabled { background: #999; cursor: not-allowed; }
+
+  /* Results screen */
+  #scoreDisplay { font-size: 3rem; font-weight: bold; margin: 20px 0 8px; }
+  .pass { color: #27ae60; }
+  .fail { color: #c0392b; }
+  #resultMsg { font-size: 0.95rem; line-height: 1.6; color: #444; margin-top: 16px; padding: 16px; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- SCREEN 1: Entry -->
+<div id="entryScreen" class="screen active">
+  <div class="brand">TalentFlow AI</div>
+  <h1>Start Your Exam</h1>
+  <h2>Fill in your details to begin</h2>
+
+  <label for="jobId">Job ID *</label>
+  <input type="text" id="jobId" placeholder="Paste the Job ID you received">
+
+  <label for="fullName">Full Name *</label>
+  <input type="text" id="fullName" placeholder="Your full name">
+
+  <label for="email">Email *</label>
+  <input type="email" id="email" placeholder="your@email.com">
+
+  <label for="phone">Phone *</label>
+  <input type="tel" id="phone" placeholder="+91 9999999999">
+
+  <label>Resume PDF *</label>
+  <label class="file-label" for="resumeFile">Choose PDF file</label>
+  <input type="file" id="resumeFile" accept=".pdf">
+  <div id="fileName">No file chosen</div>
+
+  <div id="entryError" class="error" style="display:none"></div>
+  <button class="btn" id="startBtn" onclick="startExam()">Start Exam</button>
+  <div id="loadingMsg" class="info" style="display:none">Generating your personalised questions, please wait…</div>
+</div>
+
+<!-- SCREEN 2: Exam -->
+<div id="examScreen" class="screen">
+  <div id="examHeader">
+    <div>
+      <strong id="examJobId"></strong>
+      <div style="font-size:0.8rem;color:#888;margin-top:2px" id="examCandidate"></div>
+    </div>
+    <div id="timerBox">--:--</div>
+  </div>
+
+  <div id="dotMap"></div>
+
+  <div id="questionBox">
+    <div id="questionMeta"></div>
+    <div id="questionText"></div>
+    <div id="optionsContainer"></div>
+  </div>
+
+  <div id="navRow">
+    <button onclick="navigate(-1)">← Prev</button>
+    <button onclick="navigate(1)">Next →</button>
+  </div>
+
+  <button id="submitExamBtn" onclick="submitExam()">Submit Exam</button>
+  <div id="examError" class="error" style="display:none"></div>
+</div>
+
+<!-- SCREEN 3: Results -->
+<div id="resultsScreen" class="screen">
+  <div class="brand">TalentFlow AI</div>
+  <h1>Exam Complete</h1>
+  <div id="scoreDisplay"></div>
+  <div id="passStatus"></div>
+  <div id="resultMsg"></div>
+</div>
+
+<script>
+  // State
+  let questions = [];
+  let answers = {};
+  let currentIndex = 0;
+  let candidateId = '';
+  let candidateEmail = '';
+  let deadline = '';
+  let timerInterval = null;
+  let jobId = '';
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('job_id')) {
+  document.getElementById('jobId').value = urlParams.get('job_id');
+}
+
+  // File picker label
+  document.getElementById('resumeFile').addEventListener('change', function() {
+    document.getElementById('fileName').textContent = this.files[0] ? this.files[0].name : 'No file chosen';
+  });
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  async function fileToBase64(file) {
+    return new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.onerror = () => rej(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function startExam() {
+    hideError('entryError');
+    jobId = document.getElementById('jobId').value.trim();
+    const name = document.getElementById('fullName').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const fileInput = document.getElementById('resumeFile');
+
+    if (!jobId || !name || !email || !phone) {
+      showError('entryError', 'Please fill in all fields.'); return;
+    }
+    if (!fileInput.files[0]) {
+      showError('entryError', 'Please upload your resume PDF.'); return;
+    }
+
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    document.getElementById('loadingMsg').style.display = 'block';
+
+    try {
+      const resumePdfBase64 = await fileToBase64(fileInput.files[0]);
+      const resp = await fetch(`/api/jobs/${jobId}/start-exam`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, name, email, phone, resume_pdf_base64: resumePdfBase64 })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        showError('entryError', data.detail || 'Server error. Please try again.');
+        btn.disabled = false;
+        document.getElementById('loadingMsg').style.display = 'none';
+        return;
+      }
+
+      questions = data.questions;
+      candidateId = data.candidate_id;
+      candidateEmail = email;
+      deadline = data.screening_deadline;
+      answers = {};
+      currentIndex = 0;
+
+      document.getElementById('examJobId').textContent = 'Job: ' + jobId.slice(0, 8) + '…';
+      document.getElementById('examCandidate').textContent = name + ' · ' + email;
+
+      buildDotMap();
+      renderQuestion();
+      startTimer();
+      showScreen('examScreen');
+
+    } catch (e) {
+      showError('entryError', 'Network error: ' + e.message);
+      btn.disabled = false;
+      document.getElementById('loadingMsg').style.display = 'none';
+    }
+  }
+
+  function buildDotMap() {
+    const map = document.getElementById('dotMap');
+    map.innerHTML = '';
+    questions.forEach((_, i) => {
+      const d = document.createElement('div');
+      d.className = 'dot' + (i === 0 ? ' current' : '');
+      d.title = 'Q' + (i + 1);
+      d.onclick = () => { currentIndex = i; renderQuestion(); };
+      map.appendChild(d);
+    });
+  }
+
+  function updateDotMap() {
+    const dots = document.querySelectorAll('.dot');
+    dots.forEach((d, i) => {
+      d.className = 'dot';
+      if (answers[questions[i].question_id] !== undefined) d.classList.add('answered');
+      if (i === currentIndex) d.classList.add('current');
+    });
+  }
+
+  function renderQuestion() {
+    if (!questions.length) return;
+    const q = questions[currentIndex];
+    document.getElementById('questionMeta').textContent =
+      `Question ${currentIndex + 1} of ${questions.length} · ${q.bucket.replace('_', ' ')}`;
+    document.getElementById('questionText').textContent = q.question_text;
+
+    const container = document.getElementById('optionsContainer');
+    container.innerHTML = '';
+    Object.entries(q.options).forEach(([letter, text]) => {
+      const btn = document.createElement('button');
+      btn.className = 'option' + (answers[q.question_id] === letter ? ' selected' : '');
+      btn.textContent = letter + '. ' + text;
+      btn.onclick = () => {
+        answers[q.question_id] = letter;
+        renderQuestion();
+        updateDotMap();
+      };
+      container.appendChild(btn);
+    });
+    updateDotMap();
+  }
+
+  function navigate(dir) {
+    const next = currentIndex + dir;
+    if (next >= 0 && next < questions.length) {
+      currentIndex = next;
+      renderQuestion();
+    }
+  }
+
+  function startTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    const deadlineMs = new Date(deadline).getTime();
+    timerInterval = setInterval(() => {
+      const diff = deadlineMs - Date.now();
+      if (diff <= 0) {
+        clearInterval(timerInterval);
+        document.getElementById('timerBox').textContent = '00:00';
+        submitExam();
+        return;
+      }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      document.getElementById('timerBox').textContent =
+        (h > 0 ? String(h).padStart(2,'0') + ':' : '') +
+        String(m).padStart(2,'0') + ':' +
+        String(s).padStart(2,'0');
+    }, 1000);
+  }
+
+  async function submitExam() {
+    hideError('examError');
+    const answeredCount = Object.keys(answers).length;
+    if (answeredCount === 0) {
+      showError('examError', 'Please answer at least one question before submitting.'); return;
+    }
+
+    const btn = document.getElementById('submitExamBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    if (timerInterval) clearInterval(timerInterval);
+
+    try {
+      const resp = await fetch('/api/test/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, candidate_email: candidateEmail, answers })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        showError('examError', data.detail || 'Submission failed.');
+        btn.disabled = false;
+        btn.textContent = 'Submit Exam';
+        return;
+      }
+      showResults(data);
+    } catch (e) {
+      showError('examError', 'Network error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Submit Exam';
+    }
+  }
+
+  function showResults(data) {
+    showScreen('resultsScreen');
+    const score = data.final_score;
+    const passed = data.passed;
+    document.getElementById('scoreDisplay').textContent = score + '/100';
+    document.getElementById('scoreDisplay').className = passed ? 'pass' : 'fail';
+    document.getElementById('passStatus').innerHTML =
+      passed ? '<span class="pass">✓ Passed</span>' : '<span class="fail">✗ Below threshold</span>';
+    document.getElementById('resultMsg').textContent =
+      passed
+        ? `If you passed, you will receive an email at ${candidateEmail} with your next steps within 24 hours of the deadline closing.`
+        : `Your score of ${score} did not meet the pass threshold of ${data.pass_threshold}. Thank you for attempting this position.`;
+  }
+</script>
+</body>
+</html>

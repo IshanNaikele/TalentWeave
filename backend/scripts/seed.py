@@ -61,7 +61,15 @@ Responsibilities:
 
 Experience Required: 2 to 5 years of professional backend development experience.
         """,
-        "status": "active"
+        "difficulty": "Medium",
+        "num_questions": 10,
+        "pass_threshold": 70,
+        "filter_mode": "fixed_threshold",
+        "percentile_cutoff": 5.0,
+        "public_link_active": True,
+        "status": "screening_open",
+        "include_assignment": False,
+        "recruiter_email": "maria.ops@talentweave.com",
     },
     {
         "title": "Outbound Sales Account Executive",
@@ -88,7 +96,15 @@ Responsibilities:
 
 Experience Required: 2 to 6 years of outbound B2B sales experience.
         """,
-        "status": "active"
+        "difficulty": "Medium",
+        "num_questions": 10,
+        "pass_threshold": 70,
+        "filter_mode": "fixed_threshold",
+        "percentile_cutoff": 5.0,
+        "public_link_active": True,
+        "status": "screening_open",
+        "include_assignment": False,
+        "recruiter_email": "maria.ops@talentweave.com",
     },
     {
         "title": "HR Operations Coordinator",
@@ -114,10 +130,17 @@ Responsibilities:
 
 Experience Required: 1 to 4 years of HR operations or people operations experience.
         """,
-        "status": "active"
-    }
+        "difficulty": "Medium",
+        "num_questions": 10,
+        "pass_threshold": 70,
+        "filter_mode": "fixed_threshold",
+        "percentile_cutoff": 5.0,
+        "public_link_active": True,
+        "status": "screening_open",
+        "include_assignment": False,
+        "recruiter_email": "maria.ops@talentweave.com",
+    },
 ]
-
 
 def seed():
     print("Creating tables...")
@@ -155,13 +178,43 @@ def seed():
                     title=job_data["title"],
                     department=job_data["department"],
                     requirements=job_data["requirements"],
-                    status=job_data["status"]
+                    difficulty=job_data["difficulty"],
+                    num_questions=job_data["num_questions"],
+                    pass_threshold=job_data["pass_threshold"],
+                    filter_mode=job_data["filter_mode"],
+                    percentile_cutoff=job_data["percentile_cutoff"],
+                    public_link_active=job_data["public_link_active"],
+                    status=job_data["status"],
+                    include_assignment=job_data["include_assignment"],
+                    recruiter_email=job_data["recruiter_email"],
                 )
                 db.add(job)
             db.commit()
             print("✅ Successfully seeded 3 jobs.")
+            # Step 8 — Backfill onboarding plans for seeded employees
+            import asyncio
+            from app.services.onboarding_agent import generate_automated_onboarding_plan
+            from app.models.onboarding import OnboardingPlan
 
-            
+            print("Generating onboarding plans for seeded employees...")
+            employee_emails = [
+                "alex.dev@talentweave.com", "priya.dev@talentweave.com",
+                "kevin.dev@talentweave.com", "rohan.dev@talentweave.com",
+                "sarah.sales@talentweave.com", "amit.sales@talentweave.com",
+                "viktor.sales@talentweave.com", "neha.sales@talentweave.com",
+            ]
+            for email in employee_emails:
+                user = db.query(User).filter(User.email == email).first()
+                if not user:
+                    continue
+                existing_plan = db.query(OnboardingPlan).filter(OnboardingPlan.user_id == user.id).first()
+                if existing_plan:
+                    print(f"   ⏭ {email} already has a plan, skipping.")
+                    continue
+                print(f"   🤖 Generating plan for {email}...")
+                tasks = asyncio.run(generate_automated_onboarding_plan(user_id=user.id, db=db))
+                print(f"   ✅ {email} — {tasks} tasks generated.")
+
     except Exception as e:
         db.rollback()
         print(f"❌ Seed failed: {e}")

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
+from datetime import datetime
 class ResumeExtractionSchema(BaseModel):
     full_name: str = Field(description="Full name of the candidate as mentioned in the resume.")
     email: str = Field(description="Primary email address of the candidate.")
@@ -33,3 +33,9 @@ class CandidateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class JobCreateResponse(BaseModel):
+    job_id: int
+    candidate_portal_url: str
+    screening_deadline: datetime
+    message: str

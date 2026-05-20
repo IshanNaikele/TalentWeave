@@ -5,7 +5,7 @@ __pycache__/
 my_env/
 # C extensions
 *.so
-
+backend/google_service_account.json
 # Distribution / packaging
 .Python
 build/

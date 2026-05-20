@@ -3,8 +3,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from utils.api_client import login_user
-from pages.operations import show as show_operations
-from pages.employee import show as show_employee
+from views.operations import show as show_operations
+from views.employee import show as show_employee
 
 st.set_page_config(
     page_title="TalentWeave",
