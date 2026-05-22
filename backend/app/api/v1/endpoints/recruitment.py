@@ -12,7 +12,7 @@ from app.services.parser import extract_text_from_pdf
 from app.services.llm_gateway import extract_resume_data, evaluate_candidate
 from app.schemas.recruitment import JobCreateResponse
 from app.services.scheduler_service import register_screening_deadline
-
+from typing import Optional
 
 router = APIRouter()
 
@@ -180,25 +180,50 @@ async def evaluate_application(
 @router.get("/candidates", status_code=status.HTTP_200_OK)
 def get_all_candidates(
     db: Session = Depends(get_db),
+    job_id: Optional[int] = None,
     current_user: User = Depends(require_role(["operations_team"]))
 ):
-    candidates = db.query(Candidate).all()
     result = []
 
-    for candidate in candidates:
-        application = db.query(Application).filter(
-            Application.candidate_id == candidate.id
-        ).order_by(Application.id.desc()).first()
+    if job_id:
+        applications = db.query(Application).filter(
+            Application.job_id == job_id
+        ).all()
 
-        result.append({
-            "candidate_id": candidate.id,
-            "full_name": candidate.full_name,
-            "email": candidate.email,
-            "extracted_skills": candidate.extracted_skills,
-            "application_id": application.id if application else None,
-            "status": application.status.value if application else None,
-            "ai_match_score": application.ai_match_score if application else None,
-        })
+        for application in applications:
+            candidate = db.query(Candidate).filter(
+                Candidate.id == application.candidate_id
+            ).first()
+            if not candidate:
+                continue
+            result.append({
+                "candidate_id": candidate.id,
+                "full_name": candidate.full_name,
+                "email": candidate.email,
+                "extracted_skills": candidate.extracted_skills,
+                "application_id": application.id,
+                "status": application.status.value if application.status else None,
+                "ai_match_score": application.ai_match_score,
+                "meet_url": application.meet_url,
+                "job_id": application.job_id,
+            })
+    else:
+        candidates = db.query(Candidate).all()
+        for candidate in candidates:
+            application = db.query(Application).filter(
+                Application.candidate_id == candidate.id
+            ).order_by(Application.id.desc()).first()
+            result.append({
+                "candidate_id": candidate.id,
+                "full_name": candidate.full_name,
+                "email": candidate.email,
+                "extracted_skills": candidate.extracted_skills,
+                "application_id": application.id if application else None,
+                "status": application.status.value if application else None,
+                "ai_match_score": application.ai_match_score if application else None,
+                "meet_url": application.meet_url if application else None,
+                "job_id": application.job_id if application else None,
+            })
 
     return result
 

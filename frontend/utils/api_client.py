@@ -40,9 +40,12 @@ def hire_candidate(application_id: int, temp_password: str = "Welcome@123"):
     except Exception as e:
         return {"detail": str(e)}, 500
 
-def get_all_candidates():
+def get_all_candidates(job_id: int = None):
     try:
-        res = requests.get(f"{BASE_URL}/recruitment/candidates", headers=get_headers())
+        url = f"{BASE_URL}/recruitment/candidates"
+        if job_id:
+            url += f"?job_id={job_id}"
+        res = requests.get(url, headers=get_headers())
         return res.json(), res.status_code
     except Exception as e:
         return {"detail": str(e)}, 500

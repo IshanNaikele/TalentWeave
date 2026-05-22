@@ -82,27 +82,36 @@ def show():
     with tab2:
         st.subheader("Candidate Pipeline")
 
-        # Job selector for exam scores
         jobs_data, jobs_code = get_all_jobs()
         job_map = {}
+        include_assignment_map = {}  # job_id → bool
+
         if jobs_code == 200 and isinstance(jobs_data, list):
             job_map = {f"{j['title']} (ID: {j['job_id']})": j['job_id'] for j in jobs_data}
+            include_assignment_map = {j['job_id']: j.get('include_assignment', False) for j in jobs_data}
+
         exam_score_map = {}
+        selected_job_id = None
+
         if job_map:
-            selected_job_label = st.selectbox("Filter by Job (for exam scores)", list(job_map.keys()))
+            selected_job_label = st.selectbox("Select Job", list(job_map.keys()))
             selected_job_id = job_map[selected_job_label]
 
             attempts_data, _ = get_exam_attempts(selected_job_id)
-             
             if isinstance(attempts_data, list):
                 for a in attempts_data:
                     exam_score_map[a["candidate_email"]] = a
 
-        data, code = get_all_candidates()
+        # Fix 2B — pass selected_job_id to filter candidates
+        data, code = get_all_candidates(job_id=selected_job_id)
+
+        is_assignment_job = include_assignment_map.get(selected_job_id, False)
+
         if code == 200 and data:
             for candidate in data:
                 email = candidate.get("email", "")
-                exam_info = exam_score_map.get(email) if job_map else None
+                exam_info = exam_score_map.get(email)
+                meet_url = candidate.get("meet_url")
 
                 with st.expander(f"📋 {candidate['full_name']} — {email}"):
                     skills = json.loads(candidate.get('extracted_skills') or '[]')
@@ -121,7 +130,10 @@ def show():
                         st.warning("No application linked.")
                         continue
 
+                    status = candidate.get("status", "")
+
                     col1, col2, col3 = st.columns(3)
+
                     with col1:
                         if st.button("🔍 Evaluate", key=f"eval_{app_id}"):
                             with st.spinner("Running AI evaluation..."):
@@ -130,11 +142,16 @@ def show():
                                 st.success(f"Match Score: {res.get('match_score')}")
                             else:
                                 st.error(res.get("detail", "Evaluation failed"))
+
                     with col2:
-                        status = candidate.get("status", "")
+                        # Fix 3 & 4 — only show Hire if conditions are met
                         if status == "hired":
                             st.success("✅ Already Hired")
-                        else:
+                        elif is_assignment_job:
+                            # Assignment path — hire only from Assignments tab
+                            st.info("Hire from Assignments tab")
+                        elif exam_info and exam_info.get("passed") and meet_url:
+                            # Interview path — hire only after meet link sent
                             if st.button("✅ Hire", key=f"hire_{app_id}"):
                                 with st.spinner("Processing hire..."):
                                     res, c = hire_candidate(app_id)
@@ -143,16 +160,25 @@ def show():
                                     st.rerun()
                                 else:
                                     st.error(res.get("detail", "Hire failed"))
+                        elif exam_info and exam_info.get("passed") and not meet_url:
+                            st.warning("Send Meet link first")
+                        else:
+                            st.caption("Not eligible yet")
+
                     with col3:
-                        if exam_info and exam_info.get("passed"):
-                            if st.button("📧 Send Meet", key=f"meet_{app_id}"):
-                                res, c = send_meet_invite(app_id)
-                                if c == 200:
-                                    st.success("Meet invite sent!")
-                                else:
-                                    st.error(res.get("detail", "Failed"))
+                        if exam_info and exam_info.get("passed") and not is_assignment_job:
+                            if meet_url:
+                                st.success("✅ Meet Sent")
+                            else:
+                                if st.button("📧 Send Meet", key=f"meet_{app_id}"):
+                                    res, c = send_meet_invite(app_id)
+                                    if c == 200:
+                                        st.success("Meet invite sent!")
+                                        st.rerun()
+                                    else:
+                                        st.error(res.get("detail", "Failed"))
         else:
-            st.info("No candidates found.")
+            st.info("No candidates found for this job.")
 
     # ── TAB 4: Assignment Submissions ─────────────────────────────────────
     with tab3:
